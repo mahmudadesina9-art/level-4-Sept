@@ -12,7 +12,7 @@ export default interface UserType {
   password: string;
 }
 
-const users: UserType[] = [
+export const users: UserType[] = [
   {
     id: 1,
     name: "John Doe",
