@@ -1,6 +1,9 @@
 import User from "@/lib/models/Users";
 import { ConnectDb } from "@/lib/util/db/connectDb";
+import bcrypt from "bcryptjs";
 import { NextRequest } from "next/server";
+import jwt from "jsonwebtoken";
+import { cookies } from "next/headers";
 
 export default interface UserType {
   id: number;
@@ -79,13 +82,25 @@ export async function POST(params: NextRequest) {
 
   let user = await User.findOne({
     email: userDetails.email,
-    password: userDetails.password,
   });
-  // console.log(newUser);
-  // let newId = users.length + 1;
-  // let user = users.find((c) => {
-  //   return c.email == newUser.email && c.password == newUser.password;
-  // });
+
+  let passwordValidation = await bcrypt.compare(
+    userDetails.password,
+    user.password,
+  );
+
+  if (!passwordValidation) {
+    return Response.json(
+      {
+        message: "Invalid password or email",
+        data: "",
+      },
+      {
+        status: 404,
+      },
+    );
+  }
+
   if (!user) {
     return Response.json(
       {
@@ -97,11 +112,39 @@ export async function POST(params: NextRequest) {
       },
     );
   }
+  let SECRET = process.env.JWT_SECRET;
+
+  if (!SECRET) {
+    throw new Error("Secret required");
+  }
+
+  let token = jwt.sign(
+    {
+      id: user._id,
+      email: user.email,
+      gender: user.gender,
+    },
+    SECRET,
+    {
+      expiresIn: "2h",
+    },
+  );
+
+  (await cookies()).set(token, `token: ${token}`, {
+    httpOnly: true,
+    path: "/",
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
+
   //   users.push({ ...newUser, id: newId });
   return Response.json(
     {
       message: "Login succesful",
-      data: user,
+      data: {
+        user,
+        token,
+      },
     },
     {
       status: 200,
